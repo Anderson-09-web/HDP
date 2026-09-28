@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Discord Bot Hosting"
+description = "Dashboard real para operar un único bot de Discord en Python con API, archivos persistentes, logs, dependencias y variables protegidas."
+version = "1.0.0"
+id = "artifacts/discord-bot-hosting"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24498
+
+[services.development]
+run = "pnpm --filter @workspace/discord-bot-hosting run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/discord-bot-hosting", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/discord-bot-hosting/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24498"
+BASE_PATH = "/"

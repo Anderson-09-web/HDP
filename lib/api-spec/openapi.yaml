@@ -3,13 +3,23 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Control plane for one Discord Python bot hosted on Render.
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: bot
+    description: Bot process lifecycle
+  - name: files
+    description: Persistent R2-backed bot files
+  - name: logs
+    description: Bounded backend and bot logs
+  - name: dependencies
+    description: requirements.txt management
+  - name: env
+    description: Redacted environment variable management
 paths:
   /healthz:
     get:
@@ -24,7 +34,284 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /status:
+    get:
+      operationId: getStatus
+      tags: [bot]
+      summary: Get API and bot status
+      responses:
+        "200":
+          description: Current service status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Status"
+  /bot/start:
+    post:
+      operationId: startBot
+      tags: [bot]
+      summary: Start the single bot process
+      responses:
+        "202":
+          description: Start accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse"
+        "409":
+          description: Bot is already running or busy
+  /bot/stop:
+    post:
+      operationId: stopBot
+      tags: [bot]
+      summary: Gracefully stop the bot process
+      responses:
+        "202":
+          description: Stop accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse"
+  /bot/restart:
+    post:
+      operationId: restartBot
+      tags: [bot]
+      summary: Restart the single bot process
+      responses:
+        "202":
+          description: Restart accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse"
+  /files:
+    get:
+      operationId: listFiles
+      tags: [files]
+      summary: List files and directories
+      parameters:
+        - $ref: "#/components/parameters/Path"
+      responses:
+        "200":
+          description: File tree
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileList"
+    post:
+      operationId: createFile
+      tags: [files]
+      summary: Create a file or directory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FileMutation"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileEntry"
+  /files/{path}:
+    get:
+      operationId: downloadFile
+      tags: [files]
+      summary: Download a file from R2
+      parameters:
+        - $ref: "#/components/parameters/FilePath"
+      responses:
+        "200":
+          description: File bytes
+          content:
+            application/octet-stream: {}
+    put:
+      operationId: updateFile
+      tags: [files]
+      summary: Update a file without restarting the bot
+      parameters:
+        - $ref: "#/components/parameters/FilePath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FileMutation"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileEntry"
+    delete:
+      operationId: deleteFile
+      tags: [files]
+      summary: Delete a file or directory from R2
+      parameters:
+        - $ref: "#/components/parameters/FilePath"
+      responses:
+        "204":
+          description: Deleted
+  /logs:
+    get:
+      operationId: getLogs
+      tags: [logs]
+      summary: Get a bounded, filtered log page
+      parameters:
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [ALL, INFO, WARNING, ERROR]
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+      responses:
+        "200":
+          description: Log page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogPage"
+  /logs/download:
+    get:
+      operationId: downloadLogs
+      tags: [logs]
+      summary: Download the current bounded log export
+      responses:
+        "200":
+          description: Plain text log export
+          content:
+            text/plain: {}
+  /dependencies:
+    get:
+      operationId: listDependencies
+      tags: [dependencies]
+      summary: Read requirements.txt
+      responses:
+        "200":
+          description: Dependency list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DependencyList"
+    post:
+      operationId: addDependency
+      tags: [dependencies]
+      summary: Add or change a dependency
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DependencyMutation"
+      responses:
+        "200":
+          description: Dependency list updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DependencyList"
+  /dependencies/{name}:
+    delete:
+      operationId: deleteDependency
+      tags: [dependencies]
+      summary: Remove a dependency
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Dependency list updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DependencyList"
+  /env:
+    get:
+      operationId: listEnvironment
+      tags: [env]
+      summary: List environment variable names and configured state
+      responses:
+        "200":
+          description: Redacted environment variables
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentList"
+    post:
+      operationId: createEnvironment
+      tags: [env]
+      summary: Create an environment variable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnvironmentMutation"
+      responses:
+        "201":
+          description: Variable saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentVariable"
+  /env/{name}:
+    put:
+      operationId: updateEnvironment
+      tags: [env]
+      summary: Update an environment variable
+      parameters:
+        - $ref: "#/components/parameters/EnvName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnvironmentMutation"
+      responses:
+        "200":
+          description: Variable saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentVariable"
+    delete:
+      operationId: deleteEnvironment
+      tags: [env]
+      summary: Delete an environment variable
+      parameters:
+        - $ref: "#/components/parameters/EnvName"
+      responses:
+        "204":
+          description: Deleted
 components:
+  parameters:
+    Path:
+      name: path
+      in: query
+      schema: { type: string, default: "" }
+    FilePath:
+      name: path
+      in: path
+      required: true
+      schema: { type: string }
+    EnvName:
+      name: name
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[A-Z][A-Z0-9_]*$" }
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +320,125 @@ components:
           type: string
       required:
         - status
+    BotState:
+      type: string
+      enum: [ONLINE, STARTING, OFFLINE, ERROR, RESTARTING]
+    Status:
+      type: object
+      properties:
+        api:
+          type: string
+          enum: [ONLINE, RESTARTING, OFFLINE]
+        bot:
+          $ref: "#/components/schemas/BotState"
+        pid:
+          type: integer
+          nullable: true
+        discordConnected:
+          type: boolean
+        pendingChanges:
+          type: boolean
+        lastError:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+      required: [api, bot, pid, discordConnected, pendingChanges, lastError, updatedAt]
+    ActionResponse:
+      type: object
+      properties:
+        accepted: { type: boolean }
+        message: { type: string }
+      required: [accepted, message]
+    FileEntry:
+      type: object
+      properties:
+        path: { type: string }
+        kind:
+          type: string
+          enum: [file, directory]
+        size: { type: integer }
+        updatedAt: { type: string, format: date-time }
+        content:
+          type: string
+          nullable: true
+      required: [path, kind, size, updatedAt, content]
+    FileList:
+      type: object
+      properties:
+        files:
+          type: array
+          items: { $ref: "#/components/schemas/FileEntry" }
+        pendingChanges: { type: boolean }
+      required: [files, pendingChanges]
+    FileMutation:
+      type: object
+      properties:
+        path: { type: string }
+        kind:
+          type: string
+          enum: [file, directory]
+        content: { type: string }
+      required: [path, kind]
+    LogEntry:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time }
+        level:
+          type: string
+          enum: [INFO, WARNING, ERROR]
+        source: { type: string }
+        message: { type: string }
+      required: [timestamp, level, source, message]
+    LogPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LogEntry" }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+      required: [items, page, pageSize, total]
+    Dependency:
+      type: object
+      properties:
+        name: { type: string }
+        version: { type: string }
+      required: [name, version]
+    DependencyList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Dependency" }
+      required: [items]
+    DependencyMutation:
+      type: object
+      properties:
+        name: { type: string }
+        version: { type: string }
+      required: [name, version]
+    EnvironmentVariable:
+      type: object
+      properties:
+        name: { type: string }
+        configured: { type: boolean }
+        masked: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+      required: [name, configured, masked, updatedAt]
+    EnvironmentList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/EnvironmentVariable" }
+      required: [items]
+    EnvironmentMutation:
+      type: object
+      properties:
+        name: { type: string, pattern: "^[A-Z][A-Z0-9_]*$" }
+        value: { type: string, minLength: 1 }
+      required: [name, value]
 

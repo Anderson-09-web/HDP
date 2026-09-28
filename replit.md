@@ -1,15 +1,15 @@
-# [Project name]
+# Discord Bot Hosting
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Dashboard y control plane para alojar un único bot de Discord en Python con Render, Cloudflare R2, Neon y Cloudflare Pages.
 
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/discord-bot-hosting run dev` — run the static dashboard
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required production env: see `.env.example` and `DEPLOYMENT.md`
 
 ## Stack
 
@@ -22,23 +22,34 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/discord-bot-hosting/` — frontend React/Vite estático, sin acceso directo a Discord/R2/Neon.
+- `artifacts/api-server/src/routes/` — API Express bajo `/api`.
+- `artifacts/api-server/src/services/` — supervisor Python, R2, Neon, logs, archivos y variables.
+- `bot/` — un solo proceso `discord.py`, con Cogs independientes y persistencia Neon.
+- `lib/api-spec/openapi.yaml` — contrato HTTP fuente de verdad.
+- `render.yaml`, `.env.example`, `DEPLOYMENT.md` — despliegue y configuración.
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Cloudflare Pages solo sirve el dashboard; Render es el único lugar que ejecuta Python y administra el proceso.
+- R2 es la fuente persistente de archivos; un bucket vacío bloquea el arranque en vez de borrar o inventar archivos.
+- Todos los Cogs viven dentro de un único proceso `discord.py`; un error al cargar un Cog se registra y los demás continúan.
+- Variables creadas desde el dashboard se cifran con `SESSION_SECRET` antes de guardarse en Neon y nunca se devuelven al frontend.
+- En producción la API exige un Bearer token de Clerk; en desarrollo local la autenticación se puede omitir para inspección del dashboard.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+El dashboard muestra estado real del proceso y gateway de Discord, ejecuta start/stop/restart con protección contra procesos duplicados, administra archivos R2 sin reinicios automáticos, instala dependencias, filtra y exporta logs acotados, y permite gestionar variables enmascaradas.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- La arquitectura debe mantener Pages, Render, R2, Neon y Discord separados; no introducir procesos por Cog ni simulaciones de estado.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Hay que configurar Render/R2/Neon/Clerk antes de iniciar el bot. Un `GET /api/healthz` saludable no implica que el bot pueda iniciar.
+- Los archivos deben estar en la raíz lógica del bucket R2 (`main.py`, `requirements.txt`, `cogs/...`, `utils/...`), no bajo `bot/`.
+- Los cambios de archivos quedan pendientes hasta reiniciar explícitamente el bot.
 
 ## Pointers
 
