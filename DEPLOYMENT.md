@@ -2,7 +2,7 @@
 
 La plataforma se divide en dos despliegues y no ejecuta el bot en el navegador:
 
-- **Cloudflare Pages**: `artifacts/discord-bot-hosting` como sitio estático. En Pages define `SKIP_DEPENDENCY_INSTALL=1` y `PNPM_VERSION=10.11.1`; usa como build `pnpm install --frozen-lockfile && pnpm --filter @workspace/discord-bot-hosting run build`. Output: `artifacts/discord-bot-hosting/dist/public`. Configura `VITE_API_BASE_URL` con el dominio HTTPS de Render, sin añadir `/api`; el cliente ya añade esa ruta.
+- **Cloudflare Pages**: `artifacts/discord-bot-hosting` como sitio estático. En Pages define `SKIP_DEPENDENCY_INSTALL=1` y `PNPM_VERSION=10.11.1`; usa como build `pnpm install --frozen-lockfile && pnpm --filter @workspace/discord-bot-hosting run build`. El output también está declarado en `wrangler.toml` como `artifacts/discord-bot-hosting/dist/public`, por si el panel no muestra el campo. Configura `VITE_API_BASE_URL` con el dominio HTTPS de Render, sin añadir `/api`; el cliente ya añade esa ruta.
 - **Render**: `render.yaml` ejecuta únicamente `artifacts/api-server`. Ese proceso administra el único proceso Python del bot.
 - **Cloudflare R2**: contiene los archivos del bot. El bucket debe incluir `main.py`, `requirements.txt`, `cogs/` y `utils/` en la raíz del objeto. Nunca se borra el bucket durante un reinicio.
 - **Neon**: `DATABASE_URL` apunta al Postgres de Neon. La API crea `bot_env` y `bot_config` si no existen; los Cogs usan `bot_config` para configuraciones persistentes.
