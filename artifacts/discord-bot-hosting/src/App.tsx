@@ -16,12 +16,14 @@ import {
   useListDependencies, useListEnvironment, useListFiles, useRestartBot, useStartBot, useStopBot,
   useUpdateEnvironment, useUpdateFile,
 } from '@workspace/api-client-react';
-import { setAuthTokenGetter } from '@workspace/api-client-react';
+import { setAuthTokenGetter, setBaseUrl } from '@workspace/api-client-react';
 import type { LogEntry } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
+
+setBaseUrl(import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || null);
 
 const queryClient = new QueryClient();
 
