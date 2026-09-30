@@ -2,7 +2,13 @@
 
 La plataforma se divide en dos despliegues y no ejecuta el bot en el navegador:
 
-- **Cloudflare Pages**: `artifacts/discord-bot-hosting` como sitio estático. En Pages define `SKIP_DEPENDENCY_INSTALL=1` y `PNPM_VERSION=10.11.1`; usa como build `pnpm install --frozen-lockfile && pnpm --filter @workspace/discord-bot-hosting run build`. El output también está declarado en `wrangler.toml` como `artifacts/discord-bot-hosting/dist/public`, por si el panel no muestra el campo. Configura `VITE_API_BASE_URL` con el dominio HTTPS de Render, sin añadir `/api`; el cliente ya añade esa ruta.
+- **Cloudflare Pages**: `artifacts/discord-bot-hosting` como sitio estático. Crea el proyecto desde **Workers & Pages → Create application → Pages → Connect to Git** (no desde Workers). Mantén el **Root directory** en la raíz del repositorio, porque el build usa el workspace de pnpm. Define `SKIP_DEPENDENCY_INSTALL=1` y `PNPM_VERSION=10.11.1`. En el campo **Build command** pega únicamente:
+
+  ```sh
+  pnpm install --frozen-lockfile && pnpm --filter @workspace/discord-bot-hosting run build
+  ```
+
+  En **Build output directory** escribe `artifacts/discord-bot-hosting/dist/public`. El mismo directorio está declarado en `wrangler.toml`. **Pages conectado a Git no pide Deploy command**: publica automáticamente al terminar el build. Si el formulario pide **Build command** y **Deploy command**, estás en el flujo de **Workers Builds**, no en Pages conectado a Git; vuelve y elige Pages. No pegues el texto «Build command» dentro del valor del campo: provocaría `/bin/sh: Build: not found`. Configura `VITE_API_BASE_URL` con el dominio HTTPS de Render, sin añadir `/api`; el cliente ya añade esa ruta.
 - **Render**: `render.yaml` ejecuta únicamente `artifacts/api-server`. Ese proceso administra el único proceso Python del bot.
 - **Cloudflare R2**: contiene los archivos del bot. El bucket debe incluir `main.py`, `requirements.txt`, `cogs/` y `utils/` en la raíz del objeto. Nunca se borra el bucket durante un reinicio.
 - **Neon**: `DATABASE_URL` apunta al Postgres de Neon. La API crea `bot_env` y `bot_config` si no existen; los Cogs usan `bot_config` para configuraciones persistentes.
