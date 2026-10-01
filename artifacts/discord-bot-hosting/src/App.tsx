@@ -70,6 +70,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const current = navItems.find((item) => item.href === location);
   const { data: status, isError } = useGetStatus({ query: { queryKey: getGetStatusQueryKey(), refetchInterval: 15000 } });
+  const apiConnected = status?.api === 'ONLINE';
+  const apiUnavailable = isError || (status != null && !apiConnected);
   return <div className="app-shell">
     <aside className="sidebar">
       <Link href="/" className="brand" data-testid="link-brand"><span className="brand-mark">ƒ</span><span><span className="brand-name">botctl</span><span className="brand-sub">python runtime</span></span></Link>
@@ -78,7 +80,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <div className="sidebar-foot"><strong>atlas-bot / production</strong>single instance · Python 3.12<br />Region us-east · Render</div>
     </aside>
     <main className="main">
-      <header className="topbar"><div className="crumb"><span>botctl</span><span>/</span><span className="crumb-current">{current?.label ?? 'Not found'}</span></div><div className="top-actions"><div className="api-chip" data-testid="status-api-connection"><span className={`dot ${isError ? 'danger' : status ? 'success' : 'warning'}`} />{isError ? 'API offline' : status ? 'API connected' : 'Connecting'}</div>{import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ? <UserButton afterSignOutUrl="/" /> : <div className="avatar" data-testid="avatar-user">MC</div>}</div></header>
+      <header className="topbar"><div className="crumb"><span>botctl</span><span>/</span><span className="crumb-current">{current?.label ?? 'Not found'}</span></div><div className="top-actions"><div className="api-chip" data-testid="status-api-connection"><span className={`dot ${apiUnavailable ? 'danger' : apiConnected ? 'success' : 'warning'}`} />{apiUnavailable ? 'API offline' : apiConnected ? 'API connected' : 'Connecting'}</div>{import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ? <UserButton afterSignOutUrl="/" /> : <div className="avatar" data-testid="avatar-user">MC</div>}</div></header>
       <div className="content">{children}</div>
     </main>
   </div>;
