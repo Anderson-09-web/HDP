@@ -21,8 +21,14 @@ Desde el panel, **Files → Cargar archivos iniciales** carga el contenido de `b
 
 ## Variables requeridas en Render
 
-Configura en Render las variables listadas en `.env.example`. `SESSION_SECRET`, `CLERK_SECRET_KEY`, `DATABASE_URL` y las claves R2 son secretos; no se devuelven al frontend. `FRONTEND_URL` debe ser el dominio exacto de Cloudflare Pages (`https://31292a7c.hdp-1xo.pages.dev`). `DISCORD_TOKEN` puede configurarse aquí o desde Settings; el secreto guardado en el panel se cifra en Neon y se pasa al proceso del bot al iniciarlo.
+Configura en Render las variables listadas en `.env.example`. `SESSION_SECRET`, `CLERK_SECRET_KEY`, `DATABASE_URL` y las claves R2 son secretos; no se devuelven al frontend. `FRONTEND_URL` debe ser el dominio exacto de Cloudflare Pages (`https://hdp-1xo.pages.dev`). `DISCORD_TOKEN` puede configurarse aquí o desde Settings; el secreto guardado en el panel se cifra en Neon y se pasa al proceso del bot al iniciarlo.
 
 ## Auth
 
-En desarrollo local, la API permite operar sin Clerk únicamente para facilitar el arranque del dashboard. En producción exige un Bearer token válido de Clerk. El frontend añade el token de la sesión automáticamente cuando `VITE_CLERK_PUBLISHABLE_KEY` está configurada.
+En desarrollo local, la API permite operar sin Clerk únicamente para facilitar el arranque del dashboard. En producción exige un Bearer token válido de Clerk. Como el API está en otro origen (Render), el frontend añade el token de la sesión automáticamente y Render lo verifica con `CLERK_SECRET_KEY`. Las dos claves deben pertenecer a la misma instancia.
+
+### Clerk sin dominio propio
+
+Clerk exige un dominio Production confirmado y bajo tu control. El hostname gratuito `*.pages.dev` pertenece al hosting y no se puede confirmar con tus propios registros DNS; una clave `pk_live_` no es compatible con ese dominio. El código de este repositorio no establece `CLERK_FRONTEND_API`, `Clerk-Frontend-Api` ni `Clerk-Proxy-Url`: el Frontend API se obtiene de la clave pública. El proxy oficial puede reemplazar el CNAME del Frontend API, pero no convierte un hostname `pages.dev` en un dominio Production confirmado.
+
+Sin comprar un dominio, la alternativa compatible es usar el par de claves de la instancia **Development** de Clerk: `VITE_CLERK_PUBLISHABLE_KEY` (`pk_test_…`) en Cloudflare Pages y la clave secreta coincidente (`sk_test_…`) en Render. Esto autentica contra la instancia Development y sus cuentas separadas; no es la instancia Production ni debe usarse para datos o usuarios de producción. Después de cambiar las variables, vuelve a desplegar Pages y reinicia el servicio de Render. Nunca pongas la clave secreta en Pages ni la compartas.

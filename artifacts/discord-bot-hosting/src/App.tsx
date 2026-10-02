@@ -267,11 +267,30 @@ function Router() {
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
   useEffect(() => {
     setAuthTokenGetter(() => getToken());
     return () => setAuthTokenGetter(null);
   }, [getToken]);
-  if (!isLoaded) return <div className="auth-state">Loading secure session…</div>;
+  useEffect(() => {
+    if (isLoaded) {
+      setLoadTimedOut(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => setLoadTimedOut(true), 15000);
+    return () => window.clearTimeout(timeout);
+  }, [isLoaded]);
+  if (!isLoaded && loadTimedOut) {
+    return <div className="auth-state">
+      <div className="card auth-card" role="alert" data-testid="clerk-load-timeout">
+        <div className="eyebrow">Autenticación</div>
+        <h1>No se pudo cargar la sesión de Clerk</h1>
+        <p className="lede">Clerk no respondió dentro del tiempo esperado. Comprueba que la clave pública apunte a un Frontend API activo y que el modo de la clave sea compatible con el dominio de este sitio.</p>
+        <button className="button primary" style={{ marginTop: 18 }} onClick={() => window.location.reload()} data-testid="button-retry-clerk">Reintentar conexión</button>
+      </div>
+    </div>;
+  }
+  if (!isLoaded) return <div className="auth-state" role="status">Conectando con Clerk…</div>;
   if (!isSignedIn) {
     return <div className="auth-state"><div className="card auth-card"><div className="eyebrow">Secure control plane</div><h1>Sign in to operate your bot.</h1><p className="lede">The API accepts authenticated Clerk sessions only.</p><SignInButton mode="modal"><button className="button primary">Sign in</button></SignInButton></div></div>;
   }
@@ -279,9 +298,30 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
-  const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+  const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.trim();
+  const isPagesDomain = window.location.hostname.endsWith('.pages.dev');
+  const unsupportedProductionKey = Boolean(clerkKey?.startsWith('pk_live_') && isPagesDomain);
   const router = <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>{clerkKey ? <AuthGate><Router /></AuthGate> : <Router />}</WouterRouter>;
-  return <QueryClientProvider client={queryClient}><TooltipProvider>{clerkKey ? <ClerkProvider publishableKey={clerkKey}>{router}</ClerkProvider> : router}<Toaster /></TooltipProvider></QueryClientProvider>;
+  const content = unsupportedProductionKey
+    ? <div className="auth-state">
+        <section className="card auth-card" role="alert" data-testid="clerk-pages-production-unsupported">
+          <div className="eyebrow">Clerk · Cloudflare Pages</div>
+          <h1>Clerk Production necesita un dominio confirmado</h1>
+          <p className="lede">Este sitio usa el hostname gratuito de Pages, que no puedes verificar mediante tus propios registros DNS. Clerk no admite claves Production en dominios provistos por el hosting.</p>
+          <div className="notice danger" style={{ marginTop: 16 }}>
+            <AlertTriangle size={16} />
+            <span>La aplicación no fuerza un Frontend API ni una URL de proxy. Clerk obtiene ese host de la clave pública; un 404 allí no se puede corregir cambiando el código del cliente.</span>
+          </div>
+          <div className="auth-options">
+            <div><strong>Sin comprar un dominio:</strong><p>Usa una clave Development <code>pk_test_…</code> de Clerk en Cloudflare Pages y la clave secreta <code>sk_test_…</code> correspondiente de esa misma instancia en Render. Esto usa cuentas y sesiones de Development, separadas de Production.</p></div>
+            <div><strong>Para seguir en Production:</strong><p>Conecta y confirma en Clerk un dominio cuyo DNS controles, y configura ese dominio en Cloudflare Pages.</p></div>
+          </div>
+        </section>
+      </div>
+    : clerkKey
+      ? <ClerkProvider publishableKey={clerkKey}>{router}</ClerkProvider>
+      : router;
+  return <QueryClientProvider client={queryClient}><TooltipProvider>{content}<Toaster /></TooltipProvider></QueryClientProvider>;
 }
 
 export default App;
