@@ -11,6 +11,7 @@ export type EnvironmentVariable = {
 const protectedNames = new Set([
   "DATABASE_URL",
   "SESSION_SECRET",
+  "CLERK_SECRET_KEY",
   "R2_SECRET_KEY",
   "R2_ACCESS_KEY",
   "R2_ENDPOINT",
@@ -81,6 +82,16 @@ export class EnvStore {
     return Object.fromEntries(
       result.rows.map((row) => [row.name, this.decrypt(row.encrypted_value)]),
     );
+  }
+
+  async hasConfigured(name: string): Promise<boolean> {
+    if (!this.pool) return false;
+    await this.ready;
+    const result = await this.pool.query(
+      "SELECT 1 FROM bot_env WHERE name = $1 LIMIT 1",
+      [name],
+    );
+    return result.rows.length > 0;
   }
 
   private encrypt(value: string) {

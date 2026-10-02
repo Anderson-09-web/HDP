@@ -5,6 +5,7 @@ import envRouter from "./env";
 import filesRouter from "./files";
 import healthRouter from "./health";
 import logsRouter from "./logs";
+import setupRouter from "./setup";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(filesRouter);
 router.use(logsRouter);
 router.use(dependenciesRouter);
 router.use(envRouter);
+router.use(setupRouter);
 
 export default router;

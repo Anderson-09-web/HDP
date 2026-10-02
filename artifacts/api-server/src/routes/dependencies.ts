@@ -4,8 +4,19 @@ import { dependencyLines, parseDependency } from "../services/file-service";
 
 const router = Router();
 
+async function readRequirements() {
+  try {
+    return await getR2().readText("requirements.txt");
+  } catch (error) {
+    if (error && typeof error === "object" && "name" in error && error.name === "NoSuchKey") {
+      return "";
+    }
+    throw error;
+  }
+}
+
 async function list() {
-  const content = await getR2().readText("requirements.txt");
+  const content = await readRequirements();
   return { items: dependencyLines(content).flatMap((line) => {
     const item = parseDependency(line);
     return item ? [item] : [];
@@ -24,13 +35,18 @@ router.post("/dependencies", async (req, res) => {
   try {
     const name = String(req.body?.name ?? "").trim();
     const version = String(req.body?.version ?? "").trim();
-    if (!/^[A-Za-z0-9_.-]+$/.test(name) || version.length > 32) {
+    if (
+      !/^[A-Za-z0-9_.-]+$/.test(name) ||
+      version.length > 64 ||
+      /[\r\n]/.test(version) ||
+      (version && !parseDependency(`${name}${/^(===|==|!=|~=|>=|<=|>|<)/.test(version) ? version : `==${version}`}`))
+    ) {
       res.status(400).json({ error: "Invalid dependency" });
       return;
     }
-    const current = await getR2().readText("requirements.txt");
+    const current = await readRequirements();
     const next = dependencyLines(current).filter((line) => parseDependency(line)?.name !== name);
-    next.push(`${name}${version ? version.startsWith("=") || version.startsWith(">") || version.startsWith("~") || version.startsWith("!") ? version : `==${version}` : ""}`);
+    next.push(`${name}${version ? /^(===|==|!=|~=|>=|<=|>|<)/.test(version) ? version : `==${version}` : ""}`);
     await getFiles().update("requirements.txt", `${next.join("\n")}\n`);
     await getBotManager().installDependencies(`${next.join("\n")}\n`);
     res.json(await list());
@@ -41,7 +57,7 @@ router.post("/dependencies", async (req, res) => {
 
 router.delete("/dependencies/:name", async (req, res) => {
   try {
-    const current = await getR2().readText("requirements.txt");
+    const current = await readRequirements();
     const next = dependencyLines(current).filter((line) => parseDependency(line)?.name !== req.params.name);
     await getFiles().update("requirements.txt", `${next.join("\n")}\n`);
     res.json(await list());

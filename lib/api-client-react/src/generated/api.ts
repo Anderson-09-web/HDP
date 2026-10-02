@@ -21,6 +21,7 @@ import type {
 
 import type {
   ActionResponse,
+  BootstrapFilesResult,
   DependencyList,
   DependencyMutation,
   EnvironmentList,
@@ -33,6 +34,7 @@ import type {
   HealthStatus,
   ListFilesParams,
   LogPage,
+  SetupStatus,
   Status
 } from './api.schemas';
 
@@ -129,6 +131,83 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetSetupUrl = () => {
+
+
+
+
+  return `/api/setup`
+}
+
+/**
+ * @summary Get configured-service status without exposing secret values
+ */
+export const getSetup = async ( options?: Parameters<typeof customFetch>[1]): Promise<SetupStatus> => {
+
+  return customFetch<SetupStatus>(getGetSetupUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSetupQueryKey = () => {
+    return [
+    `/api/setup`
+    ] as const;
+    }
+
+
+export const getGetSetupQueryOptions = <TData = Awaited<ReturnType<typeof getSetup>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSetup>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSetupQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSetup>>> = ({ signal }) => getSetup({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSetup>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSetupQueryResult = NonNullable<Awaited<ReturnType<typeof getSetup>>>
+export type GetSetupQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get configured-service status without exposing secret values
+ */
+
+export function useGetSetup<TData = Awaited<ReturnType<typeof getSetup>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSetup>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSetupQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -610,6 +689,80 @@ export const useCreateFile = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateFileMutationOptions(options));
+    }
+
+export const getBootstrapFilesUrl = () => {
+
+
+
+
+  return `/api/files/bootstrap`
+}
+
+/**
+ * @summary Add default bot files without replacing existing files
+ */
+export const bootstrapFiles = async ( options?: Parameters<typeof customFetch>[1]): Promise<BootstrapFilesResult> => {
+
+  return customFetch<BootstrapFilesResult>(getBootstrapFilesUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getBootstrapFilesMutationKey = () => ['bootstrapFiles'] as const;
+
+export const getBootstrapFilesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bootstrapFiles>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bootstrapFiles>>, TError,void, TContext> => {
+
+const mutationKey = getBootstrapFilesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bootstrapFiles>>, void> = () => {
+
+
+          return  bootstrapFiles(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BootstrapFilesMutationResult = NonNullable<Awaited<ReturnType<typeof bootstrapFiles>>>
+
+    export type BootstrapFilesMutationError = ErrorType<unknown>
+
+
+    /**
+ * @summary Add default bot files without replacing existing files
+ */
+export const useBootstrapFiles = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bootstrapFiles>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bootstrapFiles>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getBootstrapFilesMutationOptions(options));
     }
 
 export const getDownloadFileUrl = (path: string,) => {

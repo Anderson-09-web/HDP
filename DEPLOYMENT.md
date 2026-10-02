@@ -8,7 +8,7 @@ La plataforma se divide en dos despliegues y no ejecuta el bot en el navegador:
   pnpm install --frozen-lockfile && pnpm --filter @workspace/discord-bot-hosting run build
   ```
 
-  En **Build output directory** escribe `artifacts/discord-bot-hosting/dist/public`. El mismo directorio está declarado en `wrangler.toml`, cuyo campo `name` debe coincidir con el nombre del proyecto Pages (actualmente `hdp`). **Pages conectado a Git no pide Deploy command**: publica automáticamente al terminar el build. Si el formulario pide **Build command** y **Deploy command**, estás en el flujo de **Workers Builds**, no en Pages conectado a Git; vuelve y elige Pages. No pegues el texto «Build command» dentro del valor del campo: provocaría `/bin/sh: Build: not found`. Configura `VITE_API_BASE_URL` con el dominio HTTPS de Render, sin añadir `/api`; el cliente ya añade esa ruta.
+  En **Build output directory** escribe `artifacts/discord-bot-hosting/dist/public`. El mismo directorio está declarado en `wrangler.toml`, cuyo campo `name` debe coincidir con el nombre del proyecto Pages (actualmente `hdp`). **Pages conectado a Git no pide Deploy command**: publica automáticamente al terminar el build. Si el formulario pide **Build command** y **Deploy command**, estás en el flujo de **Workers Builds**, no en Pages conectado a Git; vuelve y elige Pages. No pegues el texto «Build command» dentro del valor del campo: provocaría `/bin/sh: Build: not found`. En **Settings → Environment variables** configura `VITE_API_BASE_URL=https://hdp-dwys.onrender.com` y `VITE_CLERK_PUBLISHABLE_KEY` con la clave pública de la misma instancia de Clerk que usa Render. No añadas `/api` a la URL. Vuelve a desplegar Pages después de cambiar variables de build.
 - **Render**: `render.yaml` ejecuta únicamente `artifacts/api-server`. Ese proceso administra el único proceso Python del bot.
 - **Cloudflare R2**: contiene los archivos del bot. El bucket debe incluir `main.py`, `requirements.txt`, `cogs/` y `utils/` en la raíz del objeto. Nunca se borra el bucket durante un reinicio.
 - **Neon**: `DATABASE_URL` apunta al Postgres de Neon. La API crea `bot_env` y `bot_config` si no existen; los Cogs usan `bot_config` para configuraciones persistentes.
@@ -17,9 +17,11 @@ La plataforma se divide en dos despliegues y no ejecuta el bot en el navegador:
 
 Antes de pulsar **Start bot**, sube por el explorador de archivos el `main.py`, `requirements.txt`, `utils/` y los Cogs. También puedes copiar el contenido de `bot/` desde este repositorio al bucket preservando las rutas relativas. Si el bucket está vacío, el supervisor se niega a arrancar para evitar ejecutar un estado incompleto.
 
+Desde el panel, **Files → Cargar archivos iniciales** carga el contenido de `bot/` directamente al bucket. Solo crea archivos que falten; repetir la acción conserva los archivos ya editados. Después, guarda `DISCORD_TOKEN` en **Settings** (se cifra y se persiste en Neon) o configúralo como variable protegida de Render. Inicia el bot desde Overview y consulta Logs. El botón de dependencias actualiza `requirements.txt` y prueba a instalar el paquete en Render.
+
 ## Variables requeridas en Render
 
-Configura en Render las variables listadas en `.env.example`. `DISCORD_TOKEN`, `SESSION_SECRET`, `CLERK_SECRET_KEY`, `DATABASE_URL` y las claves R2 son secretos; no se devuelven al frontend. `FRONTEND_URL` debe ser el dominio exacto de Cloudflare Pages.
+Configura en Render las variables listadas en `.env.example`. `SESSION_SECRET`, `CLERK_SECRET_KEY`, `DATABASE_URL` y las claves R2 son secretos; no se devuelven al frontend. `FRONTEND_URL` debe ser el dominio exacto de Cloudflare Pages (`https://31292a7c.hdp-1xo.pages.dev`). `DISCORD_TOKEN` puede configurarse aquí o desde Settings; el secreto guardado en el panel se cifra en Neon y se pasa al proceso del bot al iniciarlo.
 
 ## Auth
 

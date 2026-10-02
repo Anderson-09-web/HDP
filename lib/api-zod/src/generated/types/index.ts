@@ -7,6 +7,7 @@
  */
 
 export * from './actionResponse';
+export * from './bootstrapFilesResult';
 export * from './botState';
 export * from './dependency';
 export * from './dependencyList';
@@ -27,5 +28,6 @@ export * from './logEntry';
 export * from './logEntryLevel';
 export * from './logPage';
 export * from './pathParameter';
+export * from './setupStatus';
 export * from './status';
 export * from './statusApi';

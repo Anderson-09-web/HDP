@@ -43,6 +43,26 @@ export class FileService {
     return entry;
   }
 
+  async createMissing(files: Array<{ path: string; content: string }>) {
+    const existing = new Set((await this.r2.listAll()).map((file) => file.path));
+    const created: string[] = [];
+    const skipped: string[] = [];
+
+    for (const file of files) {
+      const filePath = safeBotPath(file.path);
+      if (existing.has(filePath)) {
+        skipped.push(filePath);
+        continue;
+      }
+      this.assertSize(file.content);
+      await this.r2.putText(filePath, file.content);
+      created.push(filePath);
+    }
+
+    if (created.length) this.pending = true;
+    return { created, skipped };
+  }
+
   async update(filePath: string, content: string) {
     const safePath = safeBotPath(filePath);
     this.assertSize(content);
@@ -84,7 +104,7 @@ export function dependencyLines(content: string) {
 }
 
 export function parseDependency(line: string) {
-  const match = /^([A-Za-z0-9_.-]+)(?:\s*(==|>=|<=|~=|!=)\s*([A-Za-z0-9.*+-]+))?$/.exec(line);
+  const match = /^([A-Za-z0-9_.-]+)(?:\s*(===|==|!=|~=|>=|<=|>|<)\s*([A-Za-z0-9.*+!_-]+))?$/.exec(line);
   if (!match) return undefined;
   return { name: match[1], version: match[2] ? `${match[2]}${match[3]}` : "" };
 }

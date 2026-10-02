@@ -1,0 +1,1 @@
+- [Bot starter files](bot-starter-files.md) — bundle the repository bot source for one-click R2 setup; never overwrite existing objects.

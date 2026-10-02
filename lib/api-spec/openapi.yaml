@@ -20,6 +20,8 @@ tags:
     description: requirements.txt management
   - name: env
     description: Redacted environment variable management
+  - name: setup
+    description: Redacted service setup status
 paths:
   /healthz:
     get:
@@ -34,6 +36,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /setup:
+    get:
+      operationId: getSetup
+      tags: [setup]
+      summary: Get configured-service status without exposing secret values
+      responses:
+        "200":
+          description: Configuration presence flags
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupStatus"
   /status:
     get:
       operationId: getStatus
@@ -115,6 +129,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FileEntry"
+  /files/bootstrap:
+    post:
+      operationId: bootstrapFiles
+      tags: [files]
+      summary: Add default bot files without replacing existing files
+      responses:
+        "200":
+          description: Created and skipped file paths
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BootstrapFilesResult"
   /files/{path}:
     get:
       operationId: downloadFile
@@ -320,6 +346,22 @@ components:
           type: string
       required:
         - status
+    SetupStatus:
+      type: object
+      properties:
+        r2Configured: { type: boolean }
+        databaseConfigured: { type: boolean }
+        environmentStoreAvailable: { type: boolean }
+        encryptionConfigured: { type: boolean }
+        authConfigured: { type: boolean }
+        discordTokenConfigured: { type: boolean }
+      required: [r2Configured, databaseConfigured, environmentStoreAvailable, encryptionConfigured, authConfigured, discordTokenConfigured]
+    BootstrapFilesResult:
+      type: object
+      properties:
+        created: { type: array, items: { type: string } }
+        skipped: { type: array, items: { type: string } }
+      required: [created, skipped]
     BotState:
       type: string
       enum: [ONLINE, STARTING, OFFLINE, ERROR, RESTARTING]

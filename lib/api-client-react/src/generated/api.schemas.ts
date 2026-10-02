@@ -9,6 +9,20 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface SetupStatus {
+  r2Configured: boolean;
+  databaseConfigured: boolean;
+  environmentStoreAvailable: boolean;
+  encryptionConfigured: boolean;
+  authConfigured: boolean;
+  discordTokenConfigured: boolean;
+}
+
+export interface BootstrapFilesResult {
+  created: string[];
+  skipped: string[];
+}
+
 export type BotState = typeof BotState[keyof typeof BotState];
 
 

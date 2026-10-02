@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getFiles, getR2 } from "../services";
 import { safeBotPath } from "../services/file-service";
+import { botTemplateFiles } from "../services/bot-template";
 
 const router = Router();
 
@@ -22,6 +23,14 @@ router.post("/files", async (req, res) => {
     res.status(201).json(await getFiles().create({ path, kind, content }));
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : "Could not create file" });
+  }
+});
+
+router.post("/files/bootstrap", async (_req, res) => {
+  try {
+    res.status(200).json(await getFiles().createMissing(botTemplateFiles));
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Could not load starter files" });
   }
 });
 

@@ -5,25 +5,28 @@ import { Link, Route, Router as WouterRouter, Switch, useLocation } from 'wouter
 import {
   Activity, AlertTriangle, Bot, ChevronLeft, ChevronRight, CircleDot, CloudDownload,
   Code2, FileCode2, FilePlus2, Folder, HardDrive, LayoutDashboard, MoreHorizontal,
-  Package, Play, Plus, RefreshCw, RotateCw, Save, Search, Server, Settings2, Square,
-  Terminal, Trash2, Variable, X,
+  Package, Play, Plus, RefreshCw, RotateCw, Save, Search, Server, Settings2, ShieldCheck, Square,
+  Terminal, Trash2, Variable, Wrench, X,
 } from 'lucide-react';
 import {
-  FileMutationKind, GetLogsLevel, getGetLogsQueryKey, getGetStatusQueryKey, getListDependenciesQueryKey,
+  FileMutationKind, GetLogsLevel, getGetLogsQueryKey, getGetSetupQueryKey, getGetStatusQueryKey, getListDependenciesQueryKey,
   getListEnvironmentQueryKey, getListFilesQueryKey, getDownloadFileQueryKey, getDownloadLogsQueryKey,
-  useAddDependency, useCreateEnvironment, useCreateFile, useDeleteDependency,
+  useAddDependency, useBootstrapFiles, useCreateEnvironment, useCreateFile, useDeleteDependency,
   useDeleteEnvironment, useDeleteFile, useDownloadFile, useDownloadLogs, useGetLogs, useGetStatus,
-  useListDependencies, useListEnvironment, useListFiles, useRestartBot, useStartBot, useStopBot,
+  useGetSetup, useListDependencies, useListEnvironment, useListFiles, useRestartBot, useStartBot, useStopBot,
   useUpdateEnvironment, useUpdateFile,
 } from '@workspace/api-client-react';
 import { setAuthTokenGetter, setBaseUrl } from '@workspace/api-client-react';
-import type { LogEntry } from '@workspace/api-client-react';
+import type { LogEntry, SetupStatus } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 
-setBaseUrl(import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || null);
+setBaseUrl(
+  import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '') ||
+    (import.meta.env.PROD ? 'https://hdp-dwys.onrender.com' : null),
+);
 
 const queryClient = new QueryClient();
 
@@ -59,11 +62,12 @@ function PageHeading({ eyebrow, title, description, actions }: { eyebrow: string
 }
 
 const navItems = [
-  { href: '/', label: 'Overview', icon: LayoutDashboard },
-  { href: '/files', label: 'Files', icon: FileCode2 },
-  { href: '/logs', label: 'Logs', icon: Terminal },
-  { href: '/dependencies', label: 'Dependencies', icon: Package },
-  { href: '/environment', label: 'Environment', icon: Variable },
+  { href: '/', label: 'Resumen', icon: LayoutDashboard },
+  { href: '/files', label: 'Archivos', icon: FileCode2 },
+  { href: '/logs', label: 'Registros', icon: Terminal },
+  { href: '/dependencies', label: 'Dependencias', icon: Package },
+  { href: '/environment', label: 'Variables', icon: Variable },
+  { href: '/settings', label: 'Configuración', icon: Wrench },
 ];
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -122,9 +126,9 @@ function Overview() {
 }
 
 function FilesPage() {
-  const qc = useQueryClient(); const [path, setPath] = useState(''); const [content, setContent] = useState(''); const [createOpen, setCreateOpen] = useState(false); const [newPath, setNewPath] = useState(''); const [newKind, setNewKind] = useState<'file' | 'directory'>('file'); const uploadRef = useRef<HTMLInputElement>(null);
+  const qc = useQueryClient(); const [path, setPath] = useState(''); const [content, setContent] = useState(''); const [createOpen, setCreateOpen] = useState(false); const [newPath, setNewPath] = useState(''); const [newKind, setNewKind] = useState<'file' | 'directory'>('file'); const [bootstrapMessage, setBootstrapMessage] = useState(''); const uploadRef = useRef<HTMLInputElement>(null);
   const filesQuery = useListFiles({ path }, { query: { queryKey: getListFilesQueryKey({ path }) } }); const files = filesQuery.data?.files ?? [];
-  const update = useUpdateFile(); const create = useCreateFile(); const remove = useDeleteFile(); const download = useDownloadFile(path, { query: { enabled: false, queryKey: getDownloadFileQueryKey(path) } });
+  const update = useUpdateFile(); const create = useCreateFile(); const remove = useDeleteFile(); const bootstrap = useBootstrapFiles(); const download = useDownloadFile(path, { query: { enabled: false, queryKey: getDownloadFileQueryKey(path) } });
   const selected = files.find((file) => file.path === path);
   useEffect(() => { setContent(selected?.content ?? ''); }, [selected?.path, selected?.content]);
   const save = () => { if (!selected) return; update.mutate({ path: selected.path, data: { path: selected.path, kind: FileMutationKind.file, content } }, { onSuccess: () => qc.invalidateQueries({ queryKey: getListFilesQueryKey({ path }) }) }); };
@@ -132,7 +136,8 @@ function FilesPage() {
   const upload = async (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; event.target.value = ''; if (!file || file.size > 1_000_000) return; const uploadedContent = await file.text(); create.mutate({ data: { path: file.name, kind: FileMutationKind.file, content: uploadedContent } }, { onSuccess: () => qc.invalidateQueries({ queryKey: getListFilesQueryKey({ path }) }) }); };
   const del = () => { if (!selected || !window.confirm(`Delete ${selected.path}?`)) return; remove.mutate({ path: selected.path }, { onSuccess: () => { setPath(''); qc.invalidateQueries({ queryKey: getListFilesQueryKey({ path }) }); } }); };
   const downloadSelected = async () => { const result = await download.refetch(); if (result.data instanceof Blob) { const url = URL.createObjectURL(result.data); const anchor = document.createElement('a'); anchor.href = url; anchor.download = selected?.path.split('/').pop() ?? 'download'; anchor.click(); URL.revokeObjectURL(url); } };
-  return <><PageHeading eyebrow="Workspace / Files" title="Source files" description="Inspect and edit the bot workspace. Changes are saved to the control plane, not applied automatically." actions={<><button className="button" onClick={() => setCreateOpen((value) => !value)} data-testid="button-new-file"><FilePlus2 size={14} /> New</button><button className="button" onClick={() => uploadRef.current?.click()} disabled={create.isPending} data-testid="button-upload-file"><FilePlus2 size={14} /> Upload</button><input ref={uploadRef} type="file" hidden accept=".py,.txt,.json,.md,.yaml,.yml,.env" onChange={upload} /><button className="button" onClick={downloadSelected} disabled={!selected || download.isFetching} data-testid="button-download-file"><CloudDownload size={14} /> Download</button></>} />
+  return <><PageHeading eyebrow="Workspace / Files" title="Source files" description="Carga el código de tu bot en R2. Los cambios se aplican cuando reinicias el proceso." actions={<><button className="button" onClick={() => bootstrap.mutate(undefined, { onSuccess: (result) => { setBootstrapMessage(`Archivos listos: ${result.created.length} creados, ${result.skipped.length} existentes conservados.`); void qc.invalidateQueries({ queryKey: getListFilesQueryKey({ path: '' }) }); void qc.invalidateQueries({ queryKey: getListDependenciesQueryKey() }); }, onError: (error) => setBootstrapMessage(errText(error)) })} disabled={bootstrap.isPending} data-testid="button-bootstrap-files"><Bot size={14} /> {bootstrap.isPending ? 'Preparando…' : 'Cargar archivos iniciales'}</button><button className="button" onClick={() => setCreateOpen((value) => !value)} data-testid="button-new-file"><FilePlus2 size={14} /> Nuevo</button><button className="button" onClick={() => uploadRef.current?.click()} disabled={create.isPending} data-testid="button-upload-file"><FilePlus2 size={14} /> Subir</button><input ref={uploadRef} type="file" hidden accept=".py,.txt,.json,.md,.yaml,.yml,.env" onChange={upload} /><button className="button" onClick={downloadSelected} disabled={!selected || download.isFetching} data-testid="button-download-file"><CloudDownload size={14} /> Descargar</button></>} />
+    {bootstrapMessage && <div className={`notice ${bootstrapMessage.startsWith('Archivos listos:') ? '' : 'danger'}`} role="status">{bootstrapMessage}</div>}
     {filesQuery.isError && <OfflineError error={filesQuery.error} onRetry={() => filesQuery.refetch()} />}
     {createOpen && <div className="card card-pad" style={{ marginBottom: 16 }}><div className="form-row"><div className="field"><label htmlFor="new-file-path">Path</label><input id="new-file-path" className="input" placeholder="src/commands.py" value={newPath} onChange={(event) => setNewPath(event.target.value)} data-testid="input-new-file-path" /></div><div className="field"><label htmlFor="new-file-kind">Kind</label><select id="new-file-kind" className="select" value={newKind} onChange={(event) => setNewKind(event.target.value as 'file' | 'directory')} data-testid="select-new-file-kind"><option value="file">File</option><option value="directory">Directory</option></select></div><button className="button primary" onClick={add} disabled={create.isPending} data-testid="button-create-file"><Plus size={14} /> Create</button><button className="button icon" onClick={() => setCreateOpen(false)} data-testid="button-cancel-new-file"><X size={14} /></button></div></div>}
     <div className="card editor-layout"><div className="file-tree"><div className="file-tree-head"><strong>{path ? <button className="button ghost small" onClick={() => setPath('')}><ChevronLeft size={13} /> Root</button> : 'Workspace root'}</strong><span className="muted mono">{files.length}</span></div>{filesQuery.isLoading ? <div className="card-pad"><div className="skeleton" /></div> : files.length === 0 ? <EmptyState title="No files returned" body={filesQuery.isError ? 'The workspace could not be loaded.' : 'The API returned an empty workspace.'} /> : files.map((file) => <button key={file.path} className={`file-item ${selected?.path === file.path ? 'selected' : ''}`} onClick={() => setPath(file.kind === 'file' ? file.path : `${file.path}/`)} data-testid={`file-item-${file.path.replaceAll('/', '-')}`}>{file.kind === 'directory' ? <Folder size={14} /> : <FileCode2 size={14} />}{file.path}<span style={{ marginLeft: 'auto' }}><MoreHorizontal size={13} /></span></button>)}</div><div className="editor">{selected ? <><div className="editor-head"><div className="editor-title"><Code2 size={15} color="hsl(var(--primary))" /><strong>{selected.path}</strong><span className="pill neutral">{formatSize(selected.size)}</span></div><div className="actions"><button className="button small danger" onClick={del} disabled={remove.isPending} data-testid="button-delete-file"><Trash2 size={13} /> Delete</button><button className="button small primary" onClick={save} disabled={update.isPending} data-testid="button-save-file"><Save size={13} /> {update.isPending ? 'Saving' : 'Save changes'}</button></div></div><div className="editor-body"><textarea className="textarea" value={content} onChange={(event) => setContent(event.target.value)} spellCheck={false} data-testid="textarea-file-content" /><div className="muted mono" style={{ marginTop: 9, fontSize: 10 }}>Updated {formatDate(selected.updatedAt)} · edits stay pending until the runtime is restarted</div></div></> : <div className="editor-empty"><span>Select a file to inspect its contents.</span></div>}</div></div>
@@ -149,21 +154,115 @@ function LogsPage() {
 
 function DependenciesPage() {
   const qc = useQueryClient(); const [name, setName] = useState(''); const [version, setVersion] = useState('');
+  const [actionError, setActionError] = useState('');
   const query = useListDependencies({ query: { queryKey: getListDependenciesQueryKey() } }); const add = useAddDependency(); const remove = useDeleteDependency();
-  const submit = () => { if (!name.trim() || !version.trim()) return; add.mutate({ data: { name: name.trim(), version: version.trim() } }, { onSuccess: () => { setName(''); setVersion(''); qc.invalidateQueries({ queryKey: getListDependenciesQueryKey() }); } }); };
-  return <><PageHeading eyebrow="Runtime / Python" title="Dependencies" description="The declared requirements for the production bot environment." /><div className="card" style={{ marginBottom: 16 }}><div className="section-title"><h2>Add dependency</h2><span>requirements.txt</span></div><div className="card-pad"><div className="form-row"><div className="field"><label htmlFor="dependency-name">Package</label><input id="dependency-name" className="input" placeholder="discord.py" value={name} onChange={(event) => setName(event.target.value)} data-testid="input-dependency-name" /></div><div className="field"><label htmlFor="dependency-version">Version</label><input id="dependency-version" className="input" placeholder="2.4.0" value={version} onChange={(event) => setVersion(event.target.value)} data-testid="input-dependency-version" /></div><button className="button primary" onClick={submit} disabled={add.isPending} data-testid="button-add-dependency"><Plus size={14} /> Add / update</button></div></div></div>{query.isError && <OfflineError error={query.error} onRetry={() => query.refetch()} />}<div className="card">{query.isLoading ? <div className="card-pad"><div className="skeleton" /></div> : query.data?.items.length === 0 ? <EmptyState title="No dependencies declared" body="requirements.txt is empty. Add the first package when the bot needs it." /> : <div className="table-wrap"><table className="table"><thead><tr><th>Package</th><th>Version constraint</th><th style={{ textAlign: 'right' }}>Action</th></tr></thead><tbody>{query.data?.items.map((item) => <tr key={item.name} data-testid={`dependency-row-${item.name}`}><td className="mono">{item.name}</td><td className="mono">{item.version}</td><td style={{ textAlign: 'right' }}><button className="button small danger" onClick={() => remove.mutate({ name: item.name }, { onSuccess: () => qc.invalidateQueries({ queryKey: getListDependenciesQueryKey() }) })} disabled={remove.isPending} data-testid={`button-delete-dependency-${item.name}`}><Trash2 size={13} /> Remove</button></td></tr>)}</tbody></table></div>}</div></>;
+  const submit = () => {
+    if (!name.trim()) return;
+    setActionError('');
+    add.mutate({ data: { name: name.trim(), version: version.trim() } }, {
+      onSuccess: () => { setName(''); setVersion(''); void qc.invalidateQueries({ queryKey: getListDependenciesQueryKey() }); },
+      onError: (error) => setActionError(errText(error)),
+    });
+  };
+  return <>
+    <PageHeading eyebrow="Runtime / Python" title="Dependencias" description="Estas dependencias se guardan en requirements.txt y se instalan en el entorno del bot." />
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="section-title"><h2>Añadir paquete de Python</h2><span>requirements.txt</span></div>
+      <div className="card-pad">
+        <div className="form-row">
+          <div className="field"><label htmlFor="dependency-name">Paquete</label><input id="dependency-name" className="input" placeholder="discord.py" value={name} onChange={(event) => setName(event.target.value)} data-testid="input-dependency-name" /></div>
+          <div className="field"><label htmlFor="dependency-version">Versión o condición (opcional)</label><input id="dependency-version" className="input" placeholder="2.6.3 o >=2.6" value={version} onChange={(event) => setVersion(event.target.value)} data-testid="input-dependency-version" /></div>
+          <button className="button primary" onClick={submit} disabled={add.isPending || !name.trim()} data-testid="button-add-dependency"><Plus size={14} /> {add.isPending ? 'Guardando…' : 'Añadir / actualizar'}</button>
+        </div>
+        <p className="muted" style={{ fontSize: 11, marginBottom: 0 }}>Deja la versión vacía para instalar la última disponible. Al añadir un paquete, el panel intenta instalarlo también en Render.</p>
+      </div>
+    </div>
+    {actionError && <div className="notice danger" role="alert">{actionError}</div>}
+    {query.isError && <OfflineError error={query.error} onRetry={() => query.refetch()} />}
+    <div className="card">{query.isLoading ? <div className="card-pad"><div className="skeleton" /></div> : query.data?.items.length === 0 ? <EmptyState title="No hay dependencias declaradas" body="Crea requirements.txt con el botón de archivos iniciales o añade el primer paquete aquí." /> : <div className="table-wrap"><table className="table"><thead><tr><th>Paquete</th><th>Versión o condición</th><th style={{ textAlign: 'right' }}>Acción</th></tr></thead><tbody>{query.data?.items.map((item) => <tr key={item.name} data-testid={`dependency-row-${item.name}`}><td className="mono">{item.name}</td><td className="mono">{item.version || 'Sin fijar'}</td><td style={{ textAlign: 'right' }}><button className="button small danger" onClick={() => { setActionError(''); remove.mutate({ name: item.name }, { onSuccess: () => void qc.invalidateQueries({ queryKey: getListDependenciesQueryKey() }), onError: (error) => setActionError(errText(error)) }); }} disabled={remove.isPending} data-testid={`button-delete-dependency-${item.name}`}><Trash2 size={13} /> Quitar</button></td></tr>)}</tbody></table></div>}</div>
+  </>;
 }
 
 function EnvironmentPage() {
   const qc = useQueryClient(); const [name, setName] = useState(''); const [value, setValue] = useState(''); const [editing, setEditing] = useState<string | null>(null); const [showValue, setShowValue] = useState(false);
+  const [actionError, setActionError] = useState('');
   const query = useListEnvironment({ query: { queryKey: getListEnvironmentQueryKey() } }); const create = useCreateEnvironment(); const update = useUpdateEnvironment(); const remove = useDeleteEnvironment();
-  const submit = () => { if (!name.trim() || !value) return; const payload = { name: name.trim(), value }; const done = () => { setName(''); setValue(''); setEditing(null); setShowValue(false); qc.invalidateQueries({ queryKey: getListEnvironmentQueryKey() }); }; if (editing) update.mutate({ name: editing, data: payload }, { onSuccess: done }); else create.mutate({ data: payload }, { onSuccess: done }); };
-  return <><PageHeading eyebrow="Runtime / Secrets" title="Environment" description="Variable names and configuration state are visible here. Secret values remain masked by design." /><div className="card" style={{ marginBottom: 16 }}><div className="section-title"><h2>{editing ? `Update ${editing}` : 'Add environment variable'}</h2><span>Values are never listed</span></div><div className="card-pad"><div className="form-row"><div className="field"><label htmlFor="environment-name">Variable name</label><input id="environment-name" className="input mono" placeholder="DISCORD_TOKEN" value={name} onChange={(event) => setName(event.target.value.toUpperCase())} disabled={!!editing} data-testid="input-environment-name" /></div><div className="field"><label htmlFor="environment-value">Value</label><div style={{ position: 'relative' }}><input id="environment-value" className="input mono" style={{ width: '100%', paddingRight: 78 }} type={showValue ? 'text' : 'password'} placeholder={editing ? 'Enter a new value' : '••••••••'} value={value} onChange={(event) => setValue(event.target.value)} data-testid="input-environment-value" /><button className="button ghost small" style={{ position: 'absolute', right: 2, top: 2 }} onClick={() => setShowValue((current) => !current)} data-testid="button-toggle-environment-value">{showValue ? 'Mask' : 'Reveal'}</button></div></div><button className="button primary" onClick={submit} disabled={create.isPending || update.isPending} data-testid="button-save-environment"><Save size={14} /> {editing ? 'Update variable' : 'Save variable'}</button>{editing && <button className="button" onClick={() => { setEditing(null); setName(''); setValue(''); }} data-testid="button-cancel-environment">Cancel</button>}</div></div></div>{query.isError && <OfflineError error={query.error} onRetry={() => query.refetch()} />}<div className="card">{query.isLoading ? <div className="card-pad"><div className="skeleton" /></div> : query.data?.items.length === 0 ? <EmptyState title="No environment variables" body="The runtime has no variables configured yet." /> : <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>State</th><th>Last updated</th><th style={{ textAlign: 'right' }}>Actions</th></tr></thead><tbody>{query.data?.items.map((item) => <tr key={item.name} data-testid={`environment-row-${item.name}`}><td className="mono">{item.name}</td><td><span className={`pill ${item.configured ? 'success' : 'warning'}`}>{item.configured ? (item.masked ? 'CONFIGURED · MASKED' : 'CONFIGURED') : 'NOT CONFIGURED'}</span></td><td className="muted">{formatDate(item.updatedAt)}</td><td style={{ textAlign: 'right' }}><div className="actions" style={{ justifyContent: 'flex-end' }}><button className="button small" onClick={() => { setEditing(item.name); setName(item.name); setValue(''); }} data-testid={`button-edit-environment-${item.name}`}><Settings2 size={13} /> Update</button><button className="button small danger" onClick={() => remove.mutate({ name: item.name }, { onSuccess: () => qc.invalidateQueries({ queryKey: getListEnvironmentQueryKey() }) })} disabled={remove.isPending} data-testid={`button-delete-environment-${item.name}`}><Trash2 size={13} /></button></div></td></tr>)}</tbody></table></div>}</div></>;
+  const submit = () => {
+    if (!name.trim() || !value) return;
+    setActionError('');
+    const payload = { name: name.trim(), value };
+    const done = () => { setName(''); setValue(''); setEditing(null); setShowValue(false); void qc.invalidateQueries({ queryKey: getListEnvironmentQueryKey() }); void qc.invalidateQueries({ queryKey: getGetSetupQueryKey() }); };
+    const options = { onSuccess: done, onError: (error: unknown) => setActionError(errText(error)) };
+    if (editing) update.mutate({ name: editing, data: payload }, options);
+    else create.mutate({ data: payload }, options);
+  };
+  return <>
+    <PageHeading eyebrow="Runtime / Secrets" title="Variables protegidas" description="Los valores que guardas aquí se cifran en Neon y solo se inyectan al bot cuando lo inicias. Render conserva aparte las claves del servidor." />
+    <div className="notice" style={{ marginBottom: 16 }}><ShieldCheck size={16} /><span><strong>Discord:</strong> guarda <code>DISCORD_TOKEN</code> aquí para que el bot lo use. También puedes definirlo en Render; nunca lo pegues en archivos del bot.</span></div>
+    <div className="card" style={{ marginBottom: 16 }}><div className="section-title"><h2>{editing ? `Actualizar ${editing}` : 'Guardar variable protegida'}</h2><span>Los valores no se vuelven a mostrar</span></div><div className="card-pad"><div className="form-row"><div className="field"><label htmlFor="environment-name">Nombre</label><input id="environment-name" className="input mono" placeholder="DISCORD_TOKEN" value={name} onChange={(event) => setName(event.target.value.toUpperCase())} disabled={!!editing} data-testid="input-environment-name" /></div><div className="field"><label htmlFor="environment-value">Valor secreto</label><input id="environment-value" className="input mono" type="password" autoComplete="new-password" placeholder={editing ? 'Escribe el valor nuevo' : 'Pega el token o valor'} value={value} onChange={(event) => setValue(event.target.value)} data-testid="input-environment-value" /></div><button className="button primary" onClick={submit} disabled={create.isPending || update.isPending || !name.trim() || !value} data-testid="button-save-environment"><Save size={14} /> {create.isPending || update.isPending ? 'Guardando…' : editing ? 'Actualizar' : 'Guardar con cifrado'}</button>{editing && <button className="button" onClick={() => { setEditing(null); setName(''); setValue(''); }} data-testid="button-cancel-environment">Cancelar</button>}</div>{actionError && <div className="notice danger" role="alert" style={{ marginTop: 12 }}>{actionError}</div>}</div></div>
+    {query.isError && <OfflineError error={query.error} onRetry={() => query.refetch()} />}
+    <div className="card">{query.isLoading ? <div className="card-pad"><div className="skeleton" /></div> : query.data?.items.length === 0 ? <EmptyState title="Aún no hay variables guardadas aquí" body="Las variables que agregues desde esta página se cifran en Neon. Las claves de infraestructura deben permanecer en Render." /> : <div className="table-wrap"><table className="table"><thead><tr><th>Variable</th><th>Estado</th><th>Actualizada</th><th style={{ textAlign: 'right' }}>Acciones</th></tr></thead><tbody>{query.data?.items.map((item) => <tr key={item.name} data-testid={`environment-row-${item.name}`}><td className="mono">{item.name}</td><td><span className={`pill ${item.configured ? 'success' : 'warning'}`}>{item.configured ? 'CONFIGURADA · CIFRADA' : 'FALTA'}</span></td><td className="muted">{formatDate(item.updatedAt)}</td><td style={{ textAlign: 'right' }}><div className="actions" style={{ justifyContent: 'flex-end' }}><button className="button small" onClick={() => { setEditing(item.name); setName(item.name); setValue(''); }} data-testid={`button-edit-environment-${item.name}`}><Settings2 size={13} /> Actualizar</button><button className="button small danger" onClick={() => { setActionError(''); remove.mutate({ name: item.name }, { onSuccess: () => { void qc.invalidateQueries({ queryKey: getListEnvironmentQueryKey() }); void qc.invalidateQueries({ queryKey: getGetSetupQueryKey() }); }, onError: (error) => setActionError(errText(error)) }); }} disabled={remove.isPending} data-testid={`button-delete-environment-${item.name}`}><Trash2 size={13} /></button></div></td></tr>)}</tbody></table></div>}</div>
+  </>;
+}
+
+function SettingsPage() {
+  const qc = useQueryClient();
+  const setup = useGetSetup({ query: { queryKey: getGetSetupQueryKey(), refetchInterval: 20000 } });
+  const savedVariables = useListEnvironment({ query: { queryKey: getListEnvironmentQueryKey() } });
+  const create = useCreateEnvironment();
+  const update = useUpdateEnvironment();
+  const [token, setToken] = useState('');
+  const [message, setMessage] = useState('');
+  const isTokenSavedInDashboard = savedVariables.data?.items.some((item) => item.name === 'DISCORD_TOKEN') ?? false;
+
+  const saveToken = () => {
+    if (!token) return;
+    setMessage('');
+    const payload = { name: 'DISCORD_TOKEN', value: token };
+    const onSuccess = () => {
+      setToken('');
+      setMessage('Token guardado cifrado. Se usará la próxima vez que inicies el bot.');
+      void qc.invalidateQueries({ queryKey: getListEnvironmentQueryKey() });
+      void qc.invalidateQueries({ queryKey: getGetSetupQueryKey() });
+    };
+    const onError = (error: unknown) => setMessage(errText(error));
+    if (isTokenSavedInDashboard) update.mutate({ name: 'DISCORD_TOKEN', data: payload }, { onSuccess, onError });
+    else create.mutate({ data: payload }, { onSuccess, onError });
+  };
+
+  const items: Array<{ label: string; ready: boolean; detail: string }> = setup.data ? [
+    { label: 'Bucket Cloudflare R2', ready: setup.data.r2Configured, detail: 'El bucket responde con las credenciales de Render' },
+    { label: 'Base de datos Neon', ready: setup.data.databaseConfigured && setup.data.environmentStoreAvailable, detail: setup.data.environmentStoreAvailable ? 'Conexión activa para variables cifradas y datos del bot' : 'Revisa DATABASE_URL y el acceso a Neon en Render' },
+    { label: 'Cifrado de variables', ready: setup.data.encryptionConfigured, detail: 'SESSION_SECRET configurado en Render' },
+    { label: 'Autenticación Clerk', ready: setup.data.authConfigured, detail: 'CLERK_SECRET_KEY configurado en Render' },
+    { label: 'Token de Discord', ready: setup.data.discordTokenConfigured, detail: isTokenSavedInDashboard ? 'Guardado cifrado en Neon' : 'Definido en Render o pendiente de guardar aquí' },
+  ] : [];
+
+  return <>
+    <PageHeading eyebrow="Configuración" title="Conecta y configura el bot" description="Guarda el token de Discord y verifica qué servicios ya responden. Los secretos nunca aparecen en pantalla." />
+    {setup.isError && <OfflineError error={setup.error} onRetry={() => { void setup.refetch(); }} />}
+    <div className="grid grid-2" style={{ marginBottom: 16 }}>
+      <div className="card">
+        <div className="section-title"><h2>Token del bot de Discord</h2><ShieldCheck size={15} color="hsl(var(--success))" /></div>
+        <div className="card-pad">
+          <p className="muted" style={{ marginTop: 0, fontSize: 12, lineHeight: 1.6 }}>Pega aquí el token del bot creado en Discord Developer Portal. Se cifra con SESSION_SECRET y se guarda en Neon; no se muestra de nuevo. No es el token de Clerk.</p>
+          <div className="field"><label htmlFor="discord-token">DISCORD_TOKEN</label><input id="discord-token" className="input mono" type="password" autoComplete="new-password" placeholder={setup.data?.discordTokenConfigured ? 'Ya hay un token configurado; escribe uno nuevo para reemplazarlo' : 'Pega aquí el token del bot'} value={token} onChange={(event) => setToken(event.target.value)} data-testid="input-discord-token" /></div>
+          <button className="button primary" style={{ marginTop: 12 }} onClick={saveToken} disabled={!token || create.isPending || update.isPending || savedVariables.isLoading} data-testid="button-save-discord-token"><Save size={14} /> {create.isPending || update.isPending ? 'Guardando…' : isTokenSavedInDashboard ? 'Reemplazar token cifrado' : 'Guardar token cifrado'}</button>
+          {message && <div className={`notice ${message.startsWith('Token guardado') ? '' : 'danger'}`} role="status" style={{ marginTop: 12 }}>{message}</div>}
+        </div>
+      </div>
+      <div className="card">
+        <div className="section-title"><h2>Servicios conectados</h2><button className="button icon small" onClick={() => void setup.refetch()} aria-label="Actualizar estado"><RefreshCw size={13} /></button></div>
+        {setup.isLoading ? <div className="card-pad"><div className="skeleton" /></div> : <div className="status-list">{items.map((item) => <div className="status-row" key={item.label}><div><div className="status-label"><span className={`dot ${item.ready ? 'success' : 'danger'}`} />{item.label}</div><div className="status-detail" style={{ margin: '5px 0 0 25px' }}>{item.detail}</div></div><span className={`pill ${item.ready ? 'success' : 'danger'}`}>{item.ready ? 'LISTO' : 'REVISAR'}</span></div>)}</div>}
+      </div>
+    </div>
+    <div className="notice"><CircleDot size={16} /><span>Las variables para el bot se guardan desde <strong>Variables protegidas</strong>. Las claves de Render, Clerk, R2 y Neon que controlan el servidor siguen administrándose en Render; el navegador nunca las recibe.</span></div>
+  </>;
 }
 
 function Router() {
   const [location] = useLocation();
-  return <ErrorBoundary resetKey={location}><Shell><Switch><Route path="/" component={Overview} /><Route path="/files" component={FilesPage} /><Route path="/logs" component={LogsPage} /><Route path="/dependencies" component={DependenciesPage} /><Route path="/environment" component={EnvironmentPage} /><Route component={NotFound} /></Switch></Shell></ErrorBoundary>;
+  return <ErrorBoundary resetKey={location}><Shell><Switch><Route path="/" component={Overview} /><Route path="/files" component={FilesPage} /><Route path="/logs" component={LogsPage} /><Route path="/dependencies" component={DependenciesPage} /><Route path="/environment" component={EnvironmentPage} /><Route path="/settings" component={SettingsPage} /><Route component={NotFound} /></Switch></Shell></ErrorBoundary>;
 }
 
 function AuthGate({ children }: { children: React.ReactNode }) {

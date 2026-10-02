@@ -18,6 +18,19 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Get configured-service status without exposing secret values
+ */
+export const GetSetupResponse = zod.object({
+  "r2Configured": zod.boolean(),
+  "databaseConfigured": zod.boolean(),
+  "environmentStoreAvailable": zod.boolean(),
+  "encryptionConfigured": zod.boolean(),
+  "authConfigured": zod.boolean(),
+  "discordTokenConfigured": zod.boolean()
+})
+
+
+/**
  * @summary Get API and bot status
  */
 export const GetStatusResponse = zod.object({
@@ -94,6 +107,15 @@ export const CreateFileResponse = zod.object({
   "size": zod.number().int(),
   "updatedAt": zod.coerce.date(),
   "content": zod.string().nullable()
+})
+
+
+/**
+ * @summary Add default bot files without replacing existing files
+ */
+export const BootstrapFilesResponse = zod.object({
+  "created": zod.array(zod.string()),
+  "skipped": zod.array(zod.string())
 })
 
 
